@@ -1,0 +1,31 @@
+{
+  "name": "font-optimize-vue-plugin-master",
+  "version": "0.1.1",
+  "description": "webpack插件，根据项目中出现的汉字简化对应的字体文件。",
+  "main": "./src/index.js",
+  "scripts": {
+    "start": "node ./src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "author": "asforoneday",
+  "license": "MIT",
+  "bugs": {
+    "url": ""
+  },
+  "keywords": [
+    "font optimize",
+    "vue-font-min",
+    "font-min",
+    "font-simplify"
+  ],
+  "homepage": "",
+  "dependencies": {
+    "fontmin": "^0.9.8"
+  },
+  "devDependencies": {
+    "webpack": "^4.0.0"
+  }
+}
