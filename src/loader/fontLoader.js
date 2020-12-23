@@ -6,7 +6,6 @@ const FontMin = require('fontmin')
 const RuleSet = require('webpack/lib/RuleSet')
 const { save2file, getFileContent } = require('../util/cacheHelper')
 const crypto = require('crypto')
-const svgo = require('imagemin-svgo')
 
 // const cachedFileContent = new Map()
 const { cacheDir, replaceContentFilePath } = require('../fontSpiderPlugin')
