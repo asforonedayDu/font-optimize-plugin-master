@@ -6,6 +6,7 @@ const FontMin = require('fontmin')
 const RuleSet = require('webpack/lib/RuleSet')
 const { save2file, getFileContent } = require('../util/cacheHelper')
 const crypto = require('crypto')
+const svgo = require('imagemin-svgo')
 
 // const cachedFileContent = new Map()
 const { cacheDir, replaceContentFilePath } = require('../fontSpiderPlugin')
@@ -13,7 +14,7 @@ const { cacheDir, replaceContentFilePath } = require('../fontSpiderPlugin')
 const fontFileInfoMap = new Map()
 
 async function fontTask (fontSource, contents = '', fontFileTarget, outputFileTypes, callback) {
-  const { ext: targetExt, fullPath: targetFilePath, name } = fontFileTarget
+  const { ext: originExt, fullPath: targetFilePath, name } = fontFileTarget
 
   const cacheName = fontFileTarget.hashName
 
@@ -27,20 +28,28 @@ async function fontTask (fontSource, contents = '', fontFileTarget, outputFileTy
     return
   }
   // 当前字体文件  file.extname: '.ttf'
-  let resolveIndex = null
+  let matchedOriginOptimizedSource = null
   files.forEach((file, index) => {
-    if (file.extname === `.${targetExt}`) resolveIndex = index
+    if (file.extname === `.${originExt}`) matchedOriginOptimizedSource = file.contents
     save2file(path.resolve(cacheDir, `${cacheName}${file.extname}`), file.contents, null)
   })
+  if (!matchedOriginOptimizedSource) {
+    matchedOriginOptimizedSource = fontSource
+  }
   // console.log('origin name width', targetFilePath, fontSource.length, 'output new files length:', files[resolveIndex].contents.length)
 
-  callback(null, files[resolveIndex].contents)
+  callback(null, matchedOriginOptimizedSource)
 }
 
 function getReg (optimizeFontNames) {
-  let regName = optimizeFontNames.reduce((all = '', item) => {
-    return `${all && `${all}|`}${item}`
-  })
+  let regName
+  if (optimizeFontNames && optimizeFontNames.length > 0) {
+    regName = optimizeFontNames.reduce((all = '', item) => {
+      return `${all && `${all}|`}${item}`
+    })
+  } else {
+    regName = `[^\\\\|/]+?`
+  }
   return new RegExp(`(\\/|\\\\|^)(${regName})\\.(eot|ttf|woff|woff2|otf)$`, 'i')
 }
 
@@ -51,21 +60,30 @@ async function runFontMin (fontSource, contents, outputFileTypes) {
     fontmin.src(fontSource)
     fontmin.use(FontMin.glyph({
       text: contents,
-      hinting: false
+      // hinting: false
     }))
-    outputFileTypes.forEach(ext => {
+    const sequence = ['ttf', 'eot', 'svg', 'woff', 'woff2'].filter(i => outputFileTypes.includes(i))
+    sequence.forEach(ext => {
       switch (ext) {
         case 'eot':
           fontmin.use(FontMin.ttf2eot())
           break
         case 'ttf':
           fontmin.use(FontMin.otf2ttf())
+          fontmin.use(FontMin.svg2ttf())
           break
+        // case 'otf': //font-min不支持生成otf文件
+        //   fontmin.use(FontMin.otf2ttf())
+        //   break
         case 'woff':
           fontmin.use(FontMin.ttf2woff())
           break
         case 'woff2':
           fontmin.use(FontMin.ttf2woff2())
+          break
+        case 'svg':
+          fontmin.use(FontMin.ttf2svg())
+          // fontmin.use(svgo());
           break
       }
     })
@@ -78,7 +96,6 @@ async function runFontMin (fontSource, contents, outputFileTypes) {
     })
   })
 }
-
 
 async function start (options, source, callback) {
   const { hashName, originPath, originType, fontType } = qs.parse(this.resourceQuery.slice(1))
@@ -93,7 +110,7 @@ async function start (options, source, callback) {
         return
       }
       if (new Date().getTime() - start > 1000 * 20) {
-        console.log('获取字体文件超时', hashName, originType)
+        console.log('获取字体文件超时', hashName, originType, fontType)
         clearInterval(waitContent)
         callback(null, source)
       }
@@ -113,6 +130,8 @@ async function start (options, source, callback) {
     }
     const contents = getFileContent(replaceContentFilePath)
     fontTask.call(this, source, contents, item, options.outputFileTypes, callback).then()
+  } else {
+    return callback(null, source)
   }
 }
 

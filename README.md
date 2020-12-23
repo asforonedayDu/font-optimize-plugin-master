@@ -3,7 +3,7 @@
 
 这个webpack插件用于字体文件大小优化、字体格式转换以及相应的CSS代码适配。
 
-只支持TTF/OTF格式字体。
+只支持TTF/OTF/SVG格式作为原始字体，OTF字体无法精简，生成的其它格式可精简化。
 
 ### 详情
 
@@ -49,14 +49,14 @@ npm install --save-dev font-optimize-vue-plugin-master
 #### `extraContents`
 
 类型: `String`
-可为空: `是`
+默认值: ``
 
 除了从文件中搜索出的汉字，额外指定自己想要的字符串。
 
 #### `optimizeFileTypes`
 
 类型: `String|Array`
-可为空: `是`
+默认值: `[]`
 
 
 搜索汉字时指定文件后缀，比如‘vue|js’，表示只在.vue或.js文件里面搜索汉字。
@@ -68,7 +68,7 @@ npm install --save-dev font-optimize-vue-plugin-master
 #### `optimizeFontNames`
 
 类型: `String|Array`
-可为空: `否`
+默认值: `[]`
 
 要优化的字体文件名，不需要后缀，只需要文件名，不用路径信息.
 
@@ -76,13 +76,15 @@ npm install --save-dev font-optimize-vue-plugin-master
 
 单字符串，即优化一个字体文件，或者字符串数组，优化多个字体。
 
+默认优化所有符合格式的字体
+
 
 
 #### `outputFontTypes`
 
 类型: `String|Array`
 
-可为空: `否`
+默认值: `['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']`
 
 要生成的字体文件格式，目前支持otf ttf eot woff woff2五种格式。
 
@@ -91,6 +93,8 @@ npm install --save-dev font-optimize-vue-plugin-master
 如果包含EOT格式，会额外添加一个src属性以兼容IE，可参考示例。
 
 字符串形式用竖线分隔，数组形式例如：['woff2','ttf']。
+
+
 
 
 
@@ -117,7 +121,7 @@ npm install --save-dev font-optimize-vue-plugin-master
      optimizeFontNames: 'Alibaba-PuHuiTi-Medium',
      optimizeFileTypes: 'vue|js',
      extraContents: '`~!@#$%^&*()_\\-+=<>?:"{}|,./;\'[]·~！@#￥%……&*（）——-+={}|《》？：“”【】、；‘\'，。、',
-     outputFontTypes: 'woff2|woff|ttf|eot'
+     outputFontTypes: ['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']
    })
    ```
     
@@ -126,23 +130,26 @@ npm install --save-dev font-optimize-vue-plugin-master
    ```css
    @font-face {
      font-family: AlibabaPuHuiTi;
-     src: url(/fonts/font-optimized.46f7f90f.eot);
-     src: url(/fonts/font-optimized.f274b68f.woff2) format("woff2"), 
-          url(/fonts/font-optimized.82ba6d99.woff) format("woff"), 
-          url(/fonts/Alibaba-PuHuiTi-Medium.51d114ed.ttf) format("truetype"), 
-          url(/fonts/font-optimized.46f7f90f.eot) format("embedded-opentype");
+     src: url(../fonts/font-optimized.3774bf85.eot);
+     src: url(../fonts/font-optimized.a3f7e1f1.woff2) format("woff2"), 
+          url(../fonts/font-optimized.a9afa3ee.woff) format("woff"), 
+          url(../fonts/Alibaba-PuHuiTi-Medium.d9aa9348.ttf) format("truetype"), 
+          url(../fonts/font-optimized.3774bf85.eot) format("embedded-opentype"), 
+          url(../img/font-optimized.db1bd72a.svg) format("svg");
      font-weight: 600;
-     font-style: normal
+     font-style: normal;
    }
    ```
 
-   生成的这几个字体文件都是精简后的。
+   生成的这几个字体文件都是精简后的(除了otf)。
    
    注意， 如果你的CSS代码中，对应的font-face下有多个src属性，除了匹配的字体文件，其它字体文件会被删去。
 
 
 ### Vue-cli配置示例：
    ```js
+   const fontOptimizePlugin = require('font-optimize-vue-plugin-master')
+
    config.plugin('fontOptimizePlugin').use(fontOptimizePlugin, [
          {
             spiderDir: 'src/views',

@@ -1,6 +1,5 @@
 const walk = require('./fileSpider')
 const path = require('path')
-const {replaceCssSource} = require('util')
 const pluginName = 'font-simplify'
 const cacheKey = `${pluginName}-cacheKey`
 const cacheDir = path.resolve(__dirname, '.cache/')
@@ -28,27 +27,27 @@ class fontSpiderPlugin {
   constructor(option) {
     this.checkOK = false
     this.option = {}
-    const supportedExts = ['woff2', 'woff', 'svg', 'otf', 'ttf', 'eot']
-    let {spiderDir, optimizeFontNames, optimizeFileTypes, outputFontTypes = supportedExts, extraContents = ''} = option
+    const supportedExts = ['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']
+    let {spiderDir, optimizeFontNames, optimizeFileTypes = '', outputFontTypes = supportedExts, extraContents = ''} = option
     if (!extraContents instanceof String) {
       console.log('fontSpiderPlugin: option.extraContents must be type of String')
       return
     }
     this.option.extraContents = extraContents
-    if (!spiderDir) {
+    if (!spiderDir || spiderDir.length === 0) {
       console.log('fontSpiderPlugin: option.spiderDir can\'t be null')
       return
     }
     this.option.spiderDir = spiderDir instanceof Array ? spiderDir : [spiderDir]
-    if (!optimizeFontNames) {
-      console.log('fontSpiderPlugin: optimizeFontNames can\'t be null')
-      return
-    }
-    this.option.optimizeFontNames = optimizeFontNames instanceof Array ? optimizeFontNames : [optimizeFontNames]
-    if (!optimizeFileTypes) {
-      console.log('fontSpiderPlugin: optimizeFileTypes can\'t be null')
-      return
-    }
+    // if (!optimizeFontNames) {
+    //   console.log('fontSpiderPlugin: optimizeFontNames can\'t be null')
+    //   return
+    // }
+    this.option.optimizeFontNames = optimizeFontNames instanceof Array ? optimizeFontNames : (optimizeFontNames ? [optimizeFontNames] : [])
+    // if (!optimizeFileTypes) {
+    //   console.log('fontSpiderPlugin: optimizeFileTypes can\'t be null')
+    //   return
+    // }
     this.option.optimizeFileTypes = (optimizeFileTypes instanceof Array) ? optimizeFileTypes.join('|') : optimizeFileTypes
     const filter = fontExt => supportedExts.includes(fontExt)
     this.option.outputFileTypes = ((outputFontTypes instanceof Array) ? outputFontTypes : outputFontTypes.split('|')).filter(filter)
@@ -57,9 +56,6 @@ class fontSpiderPlugin {
       return
     }
     this.checkOK = true
-    this.option.contents = ''
-
-    this.chunkVersions = {}
   }
 
   apply(compiler) {
@@ -84,19 +80,25 @@ class fontSpiderPlugin {
       //   }
       // },
       // enforce: 'pre',
-      options: {...this.option, extraContents: ''}
+      options: {
+        ...this.option,
+        extraContents: ''
+      }
     }
 
     const fontLoader = {
       loader: require.resolve('./loader/fontLoader'),
       resource: {
         test: resource => {
-          const ok = /\.ttf|eot|otf|woff|woff2$/.test(resource)
+          const ok = /\.ttf|eot|otf|woff|woff2|svg$/.test(resource)
           return ok
         }
       },
       enforce: 'pre',
-      options: {...this.option, extraContents: ''}
+      options: {
+        ...this.option,
+        extraContents: ''
+      }
     }
 
     // replace original rules

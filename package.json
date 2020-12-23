@@ -26,6 +26,7 @@
     "fontmin": "^0.9.8"
   },
   "devDependencies": {
+    "imagemin-svgo": "^8.0.0",
     "webpack": "^4.0.0"
   }
 }

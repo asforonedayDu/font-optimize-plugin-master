@@ -1,6 +1,6 @@
 const fs = require('fs'),
   path = require('path');
-const {filterStr} = require('./utils')
+const {filterStr} = require('./util/utils')
 
 
 /**
