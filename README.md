@@ -1,5 +1,5 @@
 
-# font-optimize-vue-plugin-master
+# font-optimize-plugin-master
 
 这个webpack插件用于字体文件大小优化、字体格式转换以及相应的CSS代码适配。
 
@@ -25,7 +25,7 @@
 ## 安装
 
 ```bash
-npm install --save-dev font-optimize-vue-plugin-master
+npm install --save-dev font-optimize-plugin-master
 ```
 
 
