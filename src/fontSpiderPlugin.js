@@ -3,66 +3,39 @@ const path = require('path')
 const pluginName = 'font-simplify'
 const cacheKey = `${pluginName}-cacheKey`
 const cacheDir = path.resolve(__dirname, '.cache/')
-const replaceContentFilePath = path.resolve(__dirname, `.cache/${pluginName}-toReplaceContent`)
+const replaceContentFilePath = path.resolve(__dirname, `.cache/`) + path.sep
 const RuleSet = require('webpack/lib/RuleSet')
 const qs = require('querystring')
 const fs = require('fs')
 const {save2file, getFileContent, emptyDir} = require('./util/cacheHelper')
-
-function createMatcher(fakeFile) {
-  return (rule, i) => {
-    // #1201 we need to skip the `include` check when locating the vue rule
-    const clone = Object.assign({}, rule)
-    delete clone.include
-    const normalized = RuleSet.normalizeRule(clone, {}, '')
-    return (
-      !rule.enforce &&
-      normalized.resource &&
-      normalized.resource(fakeFile)
-    )
-  }
-}
+const getContent = require('./util/getContentFromDir')
+const crypto = require('crypto')
 
 class fontSpiderPlugin {
   constructor(option) {
     this.checkOK = false
     this.option = {}
-    const supportedExts = ['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']
-    let {spiderDir, optimizeFontNames, optimizeFileTypes = '', outputFontTypes = supportedExts, extraContents = ''} = option
+    // const supportedExts = ['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']
+    let {spiderDir = [], optimizeFileTypes = '', extraContents = ''} = option
     if (!extraContents instanceof String) {
       console.log('fontSpiderPlugin: option.extraContents must be type of String')
       return
     }
     this.option.extraContents = extraContents
-    if (!spiderDir || spiderDir.length === 0) {
-      console.log('fontSpiderPlugin: option.spiderDir can\'t be null')
-      return
-    }
     this.option.spiderDir = spiderDir instanceof Array ? spiderDir : [spiderDir]
-    // if (!optimizeFontNames) {
-    //   console.log('fontSpiderPlugin: optimizeFontNames can\'t be null')
-    //   return
-    // }
-    this.option.optimizeFontNames = optimizeFontNames instanceof Array ? optimizeFontNames : (optimizeFontNames ? [optimizeFontNames] : [])
-    // if (!optimizeFileTypes) {
-    //   console.log('fontSpiderPlugin: optimizeFileTypes can\'t be null')
-    //   return
-    // }
     this.option.optimizeFileTypes = (optimizeFileTypes instanceof Array) ? optimizeFileTypes.join('|') : optimizeFileTypes
-    const filter = fontExt => supportedExts.includes(fontExt)
-    this.option.outputFileTypes = ((outputFontTypes instanceof Array) ? outputFontTypes : outputFontTypes.split('|')).filter(filter)
-    if (this.option.outputFileTypes.length === 0) {
-      console.log('fontSpiderPlugin: outputFontTypes can\'t be null')
-      return
+    // const filter = fontExt => supportedExts.includes(fontExt)
+    // const toLowerCase = fontExt => fontExt.toLowerCase()
+    if (this.option.spiderDir.length > 0 || extraContents) {
+      this.checkOK = true
     }
-    this.checkOK = true
   }
 
   apply(compiler) {
     if (!this.checkOK) {
       return
     }
-    this.getContent(compiler).then()
+    this.getContentAndSave(compiler).then()
     // use webpack's RuleSet utility to normalize user rules
     const rawRules = compiler.options.module.rules
     const {rules} = new RuleSet(rawRules)
@@ -88,16 +61,23 @@ class fontSpiderPlugin {
 
     const fontLoader = {
       loader: require.resolve('./loader/fontLoader'),
-      resource: {
-        test: resource => {
-          const ok = /\.ttf|eot|otf|woff|woff2|svg$/.test(resource)
-          return ok
+      // resource: {
+      //   test: resource => {
+      //     const ok = /\.ttf|eot|otf|woff|woff2|svg$/i.test(resource)
+      //     return ok
+      //   }
+      // },
+      resourceQuery: query => {
+        const parsed = qs.parse(query.slice(1))
+        if (parsed.optimize != null && /^((woff2)|(woff)|(ttf)|(eot)|(svg))$/i.test(parsed.target)) {
+          return true
         }
+        return false
       },
       enforce: 'pre',
       options: {
         ...this.option,
-        extraContents: ''
+        // extraContents: ''
       }
     }
 
@@ -106,8 +86,29 @@ class fontSpiderPlugin {
       fontLoader,
       ...rules
     ]
+    //chunkAsset
     compiler.hooks.thisCompilation.tap(pluginName, (compilation, callback) => {
 
+      compilation.mainTemplate.hooks.assetPath.tap(`${pluginName} loader`, (path, options, assetInfo) => {
+        if (/huakanglijinheiW8/.test(path)) {
+
+          return path
+        }
+        const mm = arguments
+        return path
+      })
+
+      compilation.hooks.chunkAsset.tap(`${pluginName} loader`, (chunk, filename) => {
+
+        const mm = arguments
+        return arguments
+      })
+
+      compilation.hooks.afterOptimizeModules.tap(`${pluginName} loader`, (modules) => {
+
+        const mm = modules
+        return modules
+      })
       compilation.hooks.normalModuleLoader.tap(`${pluginName} loader`, (loaderContext, module) => {
         function insertLoader(module) {
           const loaders = module.loaders
@@ -137,23 +138,29 @@ class fontSpiderPlugin {
 
   }
 
-  async getContent(compiler) {
+  async getContentAndSave(compiler) {
     if (!fs.existsSync(cacheDir)) {
       fs.mkdirSync(cacheDir)
     } else {
       emptyDir(cacheDir)
     }
-    const {spiderDir, optimizeFileTypes, extraContents} = this.option
-    let fontContent = ''
-    for (const _dir of spiderDir) {
-      const dir = path.resolve(_dir)
-      const content = await walk(dir, optimizeFileTypes)
-      fontContent += content
+    const {extraContents} = this.option
+    let spiderContent = ''
+    if (this.option.spiderDir) {
+      spiderContent = await getContent({
+        spiderDir: this.option.spiderDir,
+        optimizeFileTypes: this.option.optimizeFileTypes
+      })
     }
-    fontContent += extraContents
+    let fontContent = extraContents + spiderContent
     fontContent = [...new Set(fontContent.split(''))].join('')
-    console.log(`在你的源码中我们找到了${fontContent.length}个汉字`)
-    save2file(replaceContentFilePath, fontContent)
+    console.log(`在指定路径下找到了${fontContent.length}个汉字（含额外指定）`)
+
+    const hash = crypto.createHash('md5')
+    hash.update(this.option.spiderDir ? this.option.spiderDir.join('') : extraContents)
+    const cacheHashName = hash.digest('hex')
+
+    save2file(replaceContentFilePath + `toReplaceContent-${cacheHashName}.txt`, fontContent)
     return fontContent
   }
 

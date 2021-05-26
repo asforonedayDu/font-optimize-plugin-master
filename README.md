@@ -18,12 +18,9 @@
   
   
   字体格式转换基于 [font-min](https://github.com/ecomfe/fontmin)
-- css代码适配
-
-  生成了新的字体文件后，引用它的css代码也会更新，会调用所有生成的字体文件。
 - 支持
 
-  支持 Vue-cli Webpack-cli 项目，其它cli项目未测试。
+  适配使用webpack和postcss的项目
 
 ## 安装
 
@@ -32,131 +29,75 @@ npm install --save-dev font-optimize-vue-plugin-master
 ```
 
 
-## 配置参数
-
-
-#### `spiderDir`
-
-类型: `String|Array`
-可为空: `否`
-
-指定搜索的目录，将在这些目录下搜索所有的汉字.
-
-比如src/  搜索相对路径下src文件夹下的所有文件
-
-单字符串，即搜索一个目录，或者字符串数组，搜索多个目录。
-
-#### `extraContents`
-
-类型: `String`
-默认值: ``
-
-除了从文件中搜索出的汉字，额外指定自己想要的字符串。
-
-#### `optimizeFileTypes`
-
-类型: `String|Array`
-默认值: `[]`
-
-
-搜索汉字时指定文件后缀，比如‘vue|js’，表示只在.vue或.js文件里面搜索汉字。
-
-考虑到项目代码文件类型多，可能只需要在某些文件里面搜索汉字.
-
-单字符串，用|分隔不同后缀，比如‘vue|js|css’,或者数组['css','js']。
-
-#### `optimizeFontNames`
-
-类型: `String|Array`
-默认值: `[]`
-
-要优化的字体文件名，不需要后缀，只需要文件名，不用路径信息.
-
-比如‘Alibaba-PuHuiTi-Medium’
-
-单字符串，即优化一个字体文件，或者字符串数组，优化多个字体。
-
-默认优化所有符合格式的字体
-
-
-
-#### `outputFontTypes`
-
-类型: `String|Array`
-
-默认值: `['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']`
-
-要生成的字体文件格式，目前支持otf ttf eot woff woff2五种格式。
-
-比如设置为：‘woff2|woff|ttf|eot’，将会生成四个对应的字体文件，并且会依照这个前后顺序由CSS代码引用。
-
-如果包含EOT格式，会额外添加一个src属性以兼容IE，可参考示例。
-
-字符串形式用竖线分隔，数组形式例如：['woff2','ttf']。
-
-
-
-
-
-### CSS代码适配
-  
+### 使用
    
- - 举个栗子：
+ - 引入插件：
+ 
+   **webpack-chain 配置方法**
+    
+   ```js
+       const fontOptimizePlugin = require('font-optimize-vue-plugin-master')
+       module.exports = {
+        /*
+        ...
+        */
+       configureWebpack: config => {
+         config.plugin('fontSpider').use(fontSpiderPlugin, [
+           {
+             spiderDir: [path.resolve('./src/pages/privacyClause')],
+             optimizeFileTypes: ['vue','js'],
+             extraContents: '`~!@#$%^&*()_\\-+=<>?:"{}|,./;\'[]·~！@#￥%……&*（）——-+={}|《》？：“”【】、；‘\'，。、',
+           }
+         ])
+       }
+      }
+   ```
+   *参数说明：*
+       
+       - `spiderDir`: 可选。指定某个具体文件夹路径，将会遍历这个路径下的文件获取中文字符，
+               类型是字符串或者多个字符串组成的数组，如果是数组会汇总所有数据。
+       - `optimizeFileTypes`: 可选。遍历文件时只访问特定后缀的文件；类型是字符串组成的数组。
+       - `extraContents`: 除了遍历文件获取汉字，可以额外指定特定的字符串，类型字符串。
+       
+       如果 spiderDir 和 extraContents 参数都为空 即未指定汉字，插件不会运行。
 
-   **CSS中有以下代码**
+
+ - 代码使用：
+
+   **找到你想处理的字体代码位置 比如下面的代码**
    
    ```css
    @font-face {
      font-family: 'AlibabaPuHuiTi';
      src: url('fonts/Alibaba-PuHuiTi-Medium.ttf');
-     font-weight: 600;
-     font-style: normal;
    }
    ```
    
-   **webpack配置为：**
-   ```js
-   new fontOptimizePlugin({
-     spiderDir: 'src/views',
-     optimizeFontNames: 'Alibaba-PuHuiTi-Medium',
-     optimizeFileTypes: 'vue|js',
-     extraContents: '`~!@#$%^&*()_\\-+=<>?:"{}|,./;\'[]·~！@#￥%……&*（）——-+={}|《》？：“”【】、；‘\'，。、',
-     outputFontTypes: ['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']
-   })
+   **在路径后添加两个参数 optimize target**
+   ```css
+   @font-face {
+     font-family: 'AlibabaPuHuiTi';
+     src: url('fonts/Alibaba-PuHuiTi-Medium.ttf?optimize&target=woff2|woff');
+   }
    ```
     
-   **那么，最后生成的CSS代码将会类似于：**
+   **将会把这个字体文件按照插件中配置的内容精简化，最后生成的CSS代码将会类似于：**
    
    ```css
    @font-face {
      font-family: AlibabaPuHuiTi;
-     src: url(../fonts/font-optimized.3774bf85.eot);
-     src: url(../fonts/font-optimized.a3f7e1f1.woff2) format("woff2"), 
-          url(../fonts/font-optimized.a9afa3ee.woff) format("woff"), 
-          url(../fonts/Alibaba-PuHuiTi-Medium.d9aa9348.ttf) format("truetype"), 
-          url(../fonts/font-optimized.3774bf85.eot) format("embedded-opentype"), 
-          url(../img/font-optimized.db1bd72a.svg) format("svg");
-     font-weight: 600;
-     font-style: normal;
+     src: url(../fonts/AlibabaPuHuiTi.55b70fb1.TTF) format('woff2'),url(../fonts/AlibabaPuHuiTi.034e7464.TTF) format('woff');
    }
    ```
-
-   生成的这几个字体文件都是精简后的(除了otf)。
    
-   注意， 如果你的CSS代码中，对应的font-face下有多个src属性，除了匹配的字体文件，其它字体文件会被删去。
+   **参数说明：**
+   - `optimize`: 必填，标识要精简这个字体文件。
+   - `target`: 必填，指定输出的字体格式，多个格式中间用竖线分隔。
+
+    
+   
 
 
-### Vue-cli配置示例：
-   ```js
-   const fontOptimizePlugin = require('font-optimize-vue-plugin-master')
 
-   config.plugin('fontOptimizePlugin').use(fontOptimizePlugin, [
-         {
-            spiderDir: 'src/views',
-            optimizeFontNames: 'Alibaba-PuHuiTi-Medium',
-            optimizeFileTypes: 'vue|js',
-            extraContents: '`~!@#$%^&*()_\\-+=<>?:"{}|,./;\'[]·~！@#￥%……&*（）——-+={}|《》？：“”【】、；‘\'，。、',
-            outputFontTypes: 'woff2|woff|ttf|eot'
-         }
-       ])
-   ```
+
+

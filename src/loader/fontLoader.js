@@ -4,55 +4,36 @@ const path = require('path')
 const qs = require('querystring')
 const FontMin = require('fontmin')
 const RuleSet = require('webpack/lib/RuleSet')
-const { save2file, getFileContent } = require('../util/cacheHelper')
+const {save2file, getFileContent} = require('../util/cacheHelper')
 const crypto = require('crypto')
 
 // const cachedFileContent = new Map()
-const { cacheDir, replaceContentFilePath } = require('../fontSpiderPlugin')
+const {cacheDir, replaceContentFilePath} = require('../fontSpiderPlugin')
 
 const fontFileInfoMap = new Map()
 
-async function fontTask (fontSource, contents = '', fontFileTarget, outputFileTypes, callback) {
-  const { ext: originExt, fullPath: targetFilePath, name } = fontFileTarget
-
-  const cacheName = fontFileTarget.hashName
-
-  // const generatorFileTypes = outputFileTypes.filter(ext => ext !== targetExt)
+async function fontTask(fontSource, contents = '', fontFileTarget, originExt, options) {
   let files
   try {
-    files = await runFontMin(fontSource, contents, outputFileTypes)
+    files = await runFontMin(fontSource, contents, [fontFileTarget])
   } catch (e) {
-    console.log('error while runFontMin:', targetFilePath, e)
-    callback(e, fontSource)
+    console.log('error while runFontMin:', options.spiderDir, e)
     return
   }
   // 当前字体文件  file.extname: '.ttf'
   let matchedOriginOptimizedSource = null
   files.forEach((file, index) => {
-    if (file.extname === `.${originExt}`) matchedOriginOptimizedSource = file.contents
-    save2file(path.resolve(cacheDir, `${cacheName}${file.extname}`), file.contents, null)
+    if (file.extname.toLowerCase() === `.${fontFileTarget.toLowerCase()}`) matchedOriginOptimizedSource = file.contents
+    // save2file(path.resolve(cacheDir, `${cacheName}${file.extname}`), file.contents, null)
   })
   if (!matchedOriginOptimizedSource) {
-    matchedOriginOptimizedSource = fontSource
+    return false
   }
   // console.log('origin name width', targetFilePath, fontSource.length, 'output new files length:', files[resolveIndex].contents.length)
-
-  callback(null, matchedOriginOptimizedSource)
+  return matchedOriginOptimizedSource
 }
 
-function getReg (optimizeFontNames) {
-  let regName
-  if (optimizeFontNames && optimizeFontNames.length > 0) {
-    regName = optimizeFontNames.reduce((all = '', item) => {
-      return `${all && `${all}|`}${item}`
-    })
-  } else {
-    regName = `[^\\\\|/]+?`
-  }
-  return new RegExp(`(\\/|\\\\|^)(${regName})\\.(eot|ttf|woff|woff2|otf)$`, 'i')
-}
-
-async function runFontMin (fontSource, contents, outputFileTypes) {
+async function runFontMin(fontSource, contents, targetFontTypes) {
   return new Promise((resolve, reject) => {
     const fontmin = new FontMin()
     // fontmin.src('../fsbuild/SourceHanSans-Normal.ttf')
@@ -61,7 +42,7 @@ async function runFontMin (fontSource, contents, outputFileTypes) {
       text: contents,
       // hinting: false
     }))
-    const sequence = ['ttf', 'eot', 'svg', 'woff', 'woff2'].filter(i => outputFileTypes.includes(i))
+    const sequence = ['ttf', 'eot', 'svg', 'woff', 'woff2'].filter(i => targetFontTypes.includes(i))
     sequence.forEach(ext => {
       switch (ext) {
         case 'eot':
@@ -96,42 +77,18 @@ async function runFontMin (fontSource, contents, outputFileTypes) {
   })
 }
 
-async function start (options, source, callback) {
-  const { hashName, originPath, originType, fontType } = qs.parse(this.resourceQuery.slice(1))
-  if (hashName && originType && fontType) {
-    const cachedPath = path.resolve(cacheDir, `${hashName}.${fontType}`)
-    const start = new Date().getTime()
-    const waitContent = setInterval(() => {
-      const cachedFile = getFileContent(cachedPath, null)
-      if (cachedFile) {
-        clearInterval(waitContent)
-        callback(null, cachedFile)
-        return
-      }
-      if (new Date().getTime() - start > 1000 * 20) {
-        console.log('获取字体文件超时', hashName, originType, fontType)
-        clearInterval(waitContent)
-        callback(null, source)
-      }
-    }, 1000)
-  } else if (hashName) {
-    const reg = getReg(options.optimizeFontNames)
-    const regResult = reg.exec(this.resourcePath)
-    if (!regResult) {
-      callback(null, source)
-      return
-    }
-    const item = {
-      fullPath: this.resourcePath + this.resourceQuery,
-      name: regResult[2],
-      ext: regResult[3],
-      hashName
-    }
-    const contents = getFileContent(replaceContentFilePath)
-    fontTask.call(this, source, contents, item, options.outputFileTypes, callback).then()
-  } else {
+async function start(source, options, callback) {
+  const {optimize, target, originExt} = qs.parse(this.resourceQuery.slice(1))
+  const hash = crypto.createHash('md5')
+  hash.update(options.spiderDir ? options.spiderDir.join('') : options.extraContents)
+  const cacheHashName = hash.digest('hex')
+  const replaceContent = getFileContent(replaceContentFilePath + `toReplaceContent-${cacheHashName}.txt`)
+
+  const result = await fontTask.call(this, source, replaceContent, target, originExt, options)
+  if (!result) {
     return callback(null, source)
   }
+  return callback(null, result)
 }
 
 exports.default = function (source) {
@@ -156,7 +113,7 @@ exports.default = function (source) {
   // })
   const callback = this.async()
   const options = LoaderUtiles.getOptions(this)
-  start.call(this, options, source, callback).then(r => {
+  start.call(this, source, options, callback).then(r => {
   })
 }
 exports.raw = true
