@@ -4,7 +4,7 @@ const path = require('path')
 // const { cacheDir, replaceContentFilePath } = require('../fontSpiderPlugin')
 const crypto = require('crypto')
 const LoaderUtils = require('loader-utils')
-const {parserQuery} = require('../util/utils')
+const { parserQuery } = require('../util/utils')
 
 const demoFontDir = path.resolve(__dirname, '../fake-font/')
 
@@ -30,7 +30,7 @@ const toObj = function (content) {
   return result
 }
 
-function generateNewFontUrl(url, query, fontType, originExt) {
+function generateNewFontUrl (url, query, fontType, originExt) {
   // const hash = crypto.createHash('md5')
   // hash.update(fullPath)
   // const cacheHashName = hash.digest('hex')
@@ -75,7 +75,7 @@ function generateNewFontUrl(url, query, fontType, originExt) {
   // return result.join(',')
 }
 
-function start(callback, source, map, meta) {
+function start (callback, source, map, meta) {
   const options = loaderUtils.getOptions(this)
   if (!meta) {
     return callback(null, ...Array.prototype.slice.call(arguments, 1))
@@ -92,8 +92,8 @@ function start(callback, source, map, meta) {
       if (arrayUrl) {
         const resultArray = []
         arrayUrl.forEach((urlBody, index) => {
-          const fullUrl = /url\((?:'|")([^\)]+?)(?:'|")\)/i.exec(urlBody)[1]
-          const {query, url, ext} = parserQuery(fullUrl)
+          const fullUrl = /url\((?:'|"|)([^\)]+?)(?:'|"|)\)/i.exec(urlBody)[1]
+          const { query, url, ext } = parserQuery(fullUrl)
           if (query.optimize !== null && typeof query.target === 'string') {
             const targetFonts = query.target.split('|')
             if (targetFonts.length > 1) {

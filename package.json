@@ -1,6 +1,6 @@
 {
   "name": "font-optimize-plugin-master",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "webpack插件，根据项目中出现的汉字简化对应的字体文件。",
   "main": "./src/index.js",
   "scripts": {
