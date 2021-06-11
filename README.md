@@ -5,19 +5,18 @@
 
 只支持TTF/OTF/SVG格式作为原始字体，OTF字体无法精简，生成的其它格式可精简化。
 
+字体处理基于 [font-min](https://github.com/ecomfe/fontmin)
+
 ### 详情
 
 - 字体优化
 
-  这个插件允许你指定特定的汉字，将字体文件的其它汉字删除，生成精简后的字体文件。
+  这个插件允许你指定特定的字符，将字体文件的其它字符删除，生成精简后的字体文件，或者不指定字符，自动用常用字符集优化。
   
-  往往我们需要的汉字就是项目代码中出现的中文，你可以指定若干目录，插件会遍历目录下的文件，搜索出所有中文。
 - 格式转换
 
-  为了满足浏览器兼容性要求，在精简汉字的同时，可以转换生成多种字体格式，支持生成otf ttf eot woff woff2几种主流格式。
+  为了满足浏览器兼容性要求，在精简字符的同时，可以转换生成多种字体格式，支持生成otf ttf eot woff woff2几种主流格式。
   
-  
-  字体格式转换基于 [font-min](https://github.com/ecomfe/fontmin)
 - 支持
 
   适配使用webpack和postcss的项目
@@ -44,23 +43,33 @@ npm install --save-dev font-optimize-plugin-master
        configureWebpack: config => {
          config.plugin('fontSpider').use(fontSpiderPlugin, [
            {
-             spiderDir: [path.resolve('./src/pages/privacyClause')],
-             optimizeFileTypes: ['vue','js'],
-             extraContents: '`~!@#$%^&*()_\\-+=<>?:"{}|,./;\'[]·~！@#￥%……&*（）——-+={}|《》？：“”【】、；‘\'，。、',
+             extraContents: '',
+             key:'',
            }
          ])
        }
       }
    ```
-   *参数说明：*
+   
+   **参数说明：**
+     - `extraContents`:
+        
+        需要筛选的指定字符，其它字符将被去除。
+      
+        如果 extraContents 为空 即未指定字符，将会默认使用3000个常用字符。
+     - `key`:
+        
+        指定处理特定的字体文件，只有字体文件的key相匹配才会优化。
+      
+        用于声明多个plugin插件，针对不同的字体文件进行不同的处理。
        
-       - `spiderDir`: 可选。指定某个具体文件夹路径，将会遍历这个路径下的文件获取中文字符，
-               类型是字符串或者多个字符串组成的数组，如果是数组会汇总所有数据。
-       - `optimizeFileTypes`: 可选。遍历文件时只访问特定后缀的文件；类型是字符串组成的数组。
-       - `extraContents`: 除了遍历文件获取汉字，可以额外指定特定的字符串，类型字符串。
-       
-       如果 spiderDir 和 extraContents 参数都为空 即未指定汉字，插件不会运行。
-
+   **手动获取常用字符集：**
+   - `commonCharacter3000` 为3000个常用中文字符加英文和标点符号
+   - `commonCharacter7000` 覆盖更多的7000个中文字符：
+   ```js
+     const fontSpiderPlugin = require('font-optimize-plugin-master')
+     const { commonCharacter7000, commonCharacter3000 } = fontSpiderPlugin    
+   ```
 
  - 代码使用：
 
@@ -73,11 +82,11 @@ npm install --save-dev font-optimize-plugin-master
    }
    ```
    
-   **在路径后添加两个参数 optimize target**
+   **在路径后添加三个参数 optimize target key**
    ```css
    @font-face {
      font-family: 'AlibabaPuHuiTi';
-     src: url('fonts/Alibaba-PuHuiTi-Medium.ttf?optimize&target=woff2|woff');
+     src: url('fonts/Alibaba-PuHuiTi-Medium.ttf?optimize&target=woff2|woff&key=1');
    }
    ```
     
@@ -93,9 +102,11 @@ npm install --save-dev font-optimize-plugin-master
    **参数说明：**
    - `optimize`: 必填，标识要精简这个字体文件。
    - `target`: 必填，指定输出的字体格式，多个格式中间用竖线分隔。
+   - `key`: 可为空，如果不为空，只有key值相同的插件实例才会优化这个字体。
 
     
    
+
 
 
 

@@ -4,15 +4,14 @@ const path = require('path')
 const qs = require('querystring')
 const FontMin = require('fontmin')
 const RuleSet = require('webpack/lib/RuleSet')
-const {save2file, getFileContent} = require('../util/cacheHelper')
-const crypto = require('crypto')
+const { save2file, getFileContent } = require('../util/cacheHelper')
+const { commonCharacter7000, commonCharacter3000 } = require('../util/commonUsedChinese')
+const { md5Content } = require('../util/utils')
 
 // const cachedFileContent = new Map()
-const {cacheDir, replaceContentFilePath} = require('../fontSpiderPlugin')
+const { cacheDir, replaceContentFilePath } = require('../fontSpiderPlugin')
 
-const fontFileInfoMap = new Map()
-
-async function fontTask(fontSource, contents = '', fontFileTarget, originExt, options) {
+async function fontTask (fontSource, contents = '', fontFileTarget, originExt, options) {
   let files
   try {
     files = await runFontMin(fontSource, contents, [fontFileTarget])
@@ -30,17 +29,24 @@ async function fontTask(fontSource, contents = '', fontFileTarget, originExt, op
     return false
   }
   // console.log('origin name width', targetFilePath, fontSource.length, 'output new files length:', files[resolveIndex].contents.length)
+  // 缓存数据
+  const fileName = generateCacheName(fontSource, contents, fontFileTarget)
+  save2file(cacheDir + fileName, matchedOriginOptimizedSource, '')
   return matchedOriginOptimizedSource
 }
 
-async function runFontMin(fontSource, contents, targetFontTypes) {
+function generateCacheName (fontSource, contents = '', fontFileTarget) {
+  return `${md5Content(`${md5Content(fontSource)}-${md5Content(contents)}-${md5Content(fontFileTarget)}`)}.${fontFileTarget}`
+}
+
+async function runFontMin (fontSource, contents, targetFontTypes) {
   return new Promise((resolve, reject) => {
     const fontmin = new FontMin()
     // fontmin.src('../fsbuild/SourceHanSans-Normal.ttf')
     fontmin.src(fontSource)
     fontmin.use(FontMin.glyph({
       text: contents,
-      // hinting: false
+      // hinting : false
     }))
     const sequence = ['ttf', 'eot', 'svg', 'woff', 'woff2'].filter(i => targetFontTypes.includes(i))
     sequence.forEach(ext => {
@@ -77,40 +83,21 @@ async function runFontMin(fontSource, contents, targetFontTypes) {
   })
 }
 
-async function start(source, options, callback) {
-  const {optimize, target, originExt} = qs.parse(this.resourceQuery.slice(1))
-  const hash = crypto.createHash('md5')
-  hash.update(options.spiderDir ? options.spiderDir.join('') : options.extraContents)
-  const cacheHashName = hash.digest('hex')
-  const replaceContent = getFileContent(replaceContentFilePath + `toReplaceContent-${cacheHashName}.txt`)
-
-  const result = await fontTask.call(this, source, replaceContent, target, originExt, options)
+async function start (source, options, callback) {
+  const { optimize, target, originExt, key = '' } = qs.parse(this.resourceQuery.slice(1))
+  const replaceContent = options.extraContents || commonCharacter3000
+  const fileName = generateCacheName(source, replaceContent, target)
+  let result = getFileContent(cacheDir + fileName, '')
   if (!result) {
-    return callback(null, source)
+    result = await fontTask.call(this, source, replaceContent, target, originExt, options)
+    if (!result) {
+      return callback(null, source)
+    }
   }
   return callback(null, result)
 }
 
-exports.default = function (source) {
-  // this._module.reasons.forEach(({ module, dependency }) => {
-  //   if (!module) {
-  //     console.log('missing module in reason')
-  //     return
-  //   }
-  //   this._compilation.moduleTemplates.javascript.hooks.content.tap(pluginName,
-  //     (moduleSource, module, options, dependencyTemplates) => {
-  //       let cssModule = null
-  //       for (let dependency of module.dependencies) {
-  //         if (dependency.module && dependency.module === this._module) {
-  //           cssModule = module
-  //           break
-  //         }
-  //       }
-  //       if (cssModule) {
-  //
-  //       }
-  //     })
-  // })
+exports.default = function (source, arg2 = {}) {
   const callback = this.async()
   const options = LoaderUtiles.getOptions(this)
   start.call(this, source, options, callback).then(r => {

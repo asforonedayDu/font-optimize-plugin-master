@@ -2,47 +2,80 @@ const walk = require('./fileSpider')
 const path = require('path')
 const pluginName = 'font-simplify'
 const cacheKey = `${pluginName}-cacheKey`
-const cacheDir = path.resolve(__dirname, '.cache/')
+const cacheDir = path.resolve(__dirname, '.cache/') + path.sep
 const replaceContentFilePath = path.resolve(__dirname, `.cache/`) + path.sep
 const RuleSet = require('webpack/lib/RuleSet')
 const qs = require('querystring')
 const fs = require('fs')
-const {save2file, getFileContent, emptyDir} = require('./util/cacheHelper')
+const { save2file, getFileContent, emptyDir } = require('./util/cacheHelper')
 const getContent = require('./util/getContentFromDir')
+const { md5Content } = require('./util/utils')
 const crypto = require('crypto')
 
 class fontSpiderPlugin {
-  constructor(option) {
+  constructor (option) {
     this.checkOK = false
     this.option = {}
     // const supportedExts = ['woff2', 'woff', 'otf', 'ttf', 'eot', 'svg']
-    let {spiderDir = [], optimizeFileTypes = '', extraContents = ''} = option
+    let { spiderDir = [], optimizeFileTypes = '', extraContents = '', key = '' } = option
     if (!extraContents instanceof String) {
       console.log('fontSpiderPlugin: option.extraContents must be type of String')
       return
     }
     this.option.extraContents = extraContents
+    this.option.key = `${key}`
     this.option.spiderDir = spiderDir instanceof Array ? spiderDir : [spiderDir]
     this.option.optimizeFileTypes = (optimizeFileTypes instanceof Array) ? optimizeFileTypes.join('|') : optimizeFileTypes
     // const filter = fontExt => supportedExts.includes(fontExt)
     // const toLowerCase = fontExt => fontExt.toLowerCase()
-    if (this.option.spiderDir.length > 0 || extraContents) {
-      this.checkOK = true
-    }
+    // if (this.option.spiderDir.length > 0 || extraContents) {
+    //   this.checkOK = true
+    // }
+    this.checkOK = true
   }
 
-  apply(compiler) {
+  apply (compiler) {
     if (!this.checkOK) {
       return
     }
-    this.getContentAndSave(compiler).then()
-    // use webpack's RuleSet utility to normalize user rules
+    const fontLoaderPath = require.resolve('./loader/fontLoader')
+    const cssLoaderPath = require.resolve('./loader/cssLoader')
     const rawRules = compiler.options.module.rules
-    const {rules} = new RuleSet(rawRules)
-    const isPostcssLoader = l => /(\/|\\|@)postcss-loader/.test(l.loader)
-    const isCssLoader = l => /(\/|\\|@)css-loader/.test(l.loader)
+    let firstLoadPlugin = !rawRules.find(item => {
+      return item.loader === fontLoaderPath
+    })
+    // use webpack's RuleSet utility to normalize user rules
+    const { rules } = new RuleSet(rawRules)
+
+    const fontLoader = {
+      loader: fontLoaderPath,
+      resourceQuery: query => {
+        const parsed = qs.parse(query.slice(1))
+        if (parsed.optimize != null && /^((woff2)|(woff)|(ttf)|(eot)|(svg))$/i.test(parsed.target)) {
+          if (this.option.key || parsed.key) {
+            return parsed.key === this.option.key
+          }
+          return true
+        }
+        return false
+      },
+      enforce: 'pre',
+      options: {
+        ...this.option,
+        // extraContents: ''
+      }
+    }
+    // replace original rules
+    compiler.options.module.rules = [
+      fontLoader,
+      ...rules
+    ]
+    // 只有第一次运行的时候需要添加CSS loader
+    if (!firstLoadPlugin) {
+      return
+    }
     const cssLoader = {
-      loader: require.resolve('./loader/cssLoader'),
+      loader: cssLoaderPath,
       // resource: {
       //   test: resource => {
       //     const ok = /\.(css|less|scss|sass)$/.test(resource)
@@ -58,59 +91,13 @@ class fontSpiderPlugin {
         extraContents: ''
       }
     }
-
-    const fontLoader = {
-      loader: require.resolve('./loader/fontLoader'),
-      // resource: {
-      //   test: resource => {
-      //     const ok = /\.ttf|eot|otf|woff|woff2|svg$/i.test(resource)
-      //     return ok
-      //   }
-      // },
-      resourceQuery: query => {
-        const parsed = qs.parse(query.slice(1))
-        if (parsed.optimize != null && /^((woff2)|(woff)|(ttf)|(eot)|(svg))$/i.test(parsed.target)) {
-          return true
-        }
-        return false
-      },
-      enforce: 'pre',
-      options: {
-        ...this.option,
-        // extraContents: ''
-      }
-    }
-
-    // replace original rules
-    compiler.options.module.rules = [
-      fontLoader,
-      ...rules
-    ]
-    //chunkAsset
     compiler.hooks.thisCompilation.tap(pluginName, (compilation, callback) => {
 
-      compilation.mainTemplate.hooks.assetPath.tap(`${pluginName} loader`, (path, options, assetInfo) => {
-        if (/huakanglijinheiW8/.test(path)) {
-
-          return path
-        }
-        const mm = arguments
-        return path
-      })
-
-      compilation.hooks.chunkAsset.tap(`${pluginName} loader`, (chunk, filename) => {
-
-        const mm = arguments
-        return arguments
-      })
-
-      compilation.hooks.afterOptimizeModules.tap(`${pluginName} loader`, (modules) => {
-
-        const mm = modules
-        return modules
-      })
       compilation.hooks.normalModuleLoader.tap(`${pluginName} loader`, (loaderContext, module) => {
-        function insertLoader(module) {
+        const isPostcssLoader = l => /(\/|\\|@)postcss-loader/.test(l.loader)
+        const isCssLoader = l => /(\/|\\|@)css-loader/.test(l.loader)
+
+        function insertLoader (module) {
           const loaders = module.loaders
           if (loaders.findIndex(l => l.loader === cssLoader.loader) > -1) return
           let i = loaders.findIndex(isPostcssLoader)
@@ -134,17 +121,36 @@ class fontSpiderPlugin {
         }
         return module
       })
-    })
 
+      // compilation.mainTemplate.hooks.assetPath.tap(`${pluginName} loader`, (path, options, assetInfo) => {
+      //   if (/huakanglijinheiW8/.test(path)) {
+      //
+      //     return path
+      //   }
+      //   const mm = arguments
+      //   return path
+      // })
+      // compilation.hooks.chunkAsset.tap(`${pluginName} loader`, (chunk, filename) => {
+      //
+      //   const mm = arguments
+      //   return arguments
+      // })
+      // compilation.hooks.afterOptimizeModules.tap(`${pluginName} loader`, (modules) => {
+      //
+      //   const mm = modules
+      //   return modules
+      // })
+    })
+    // this.getContentAndSave(compiler).then()
   }
 
-  async getContentAndSave(compiler) {
+  async getContentAndSave (compiler) {
     if (!fs.existsSync(cacheDir)) {
       fs.mkdirSync(cacheDir)
     } else {
       emptyDir(cacheDir)
     }
-    const {extraContents} = this.option
+    const { extraContents } = this.option
     let spiderContent = ''
     if (this.option.spiderDir) {
       spiderContent = await getContent({
@@ -154,11 +160,9 @@ class fontSpiderPlugin {
     }
     let fontContent = extraContents + spiderContent
     fontContent = [...new Set(fontContent.split(''))].join('')
-    console.log(`在指定路径下找到了${fontContent.length}个汉字（含额外指定）`)
+    console.log(` ${fontContent.length} characters were found in specified dirs with extraContents. `)
 
-    const hash = crypto.createHash('md5')
-    hash.update(this.option.spiderDir ? this.option.spiderDir.join('') : extraContents)
-    const cacheHashName = hash.digest('hex')
+    const cacheHashName = md5Content(this.option.spiderDir ? this.option.spiderDir.join('') : extraContents)
 
     save2file(replaceContentFilePath + `toReplaceContent-${cacheHashName}.txt`, fontContent)
     return fontContent

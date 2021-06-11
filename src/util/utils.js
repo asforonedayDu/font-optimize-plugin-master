@@ -1,7 +1,8 @@
 const fs = require('fs'),
   path = require('path')
+const crypto = require('crypto')
 
-function parserQuery (str = '') {
+function parserQuery(str = '') {
   const query = {}
   let url = ''
   const splitArray = str.replace(/\?\?/g, '?').split('?')
@@ -25,9 +26,15 @@ function parserQuery (str = '') {
   }
 }
 
-function filterStr (str) {
+function filterStr(str) {
   const s = new Set(Array.from(str))
   return Array.from(s).join('')
+}
+
+function md5Content(content) {
+  const hash = crypto.createHash('md5')
+  hash.update(content)
+  return hash.digest('hex')
 }
 
 // const resolve = this['_compiler'].resolverFactory.get('normal')
@@ -50,6 +57,7 @@ function filterStr (str) {
 module.exports = {
   filterStr,
   parserQuery,
+  md5Content,
 }
 
 
