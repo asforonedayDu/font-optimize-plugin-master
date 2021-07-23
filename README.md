@@ -7,6 +7,8 @@
 
 字体处理基于 [font-min](https://github.com/ecomfe/fontmin)
 
+联系作者：QQ729961328
+
 ### 详情
 
 - 字体优化
